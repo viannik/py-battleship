@@ -48,20 +48,27 @@ class Ship:
 
 
 class Battleship:
-    def __init__(self, ships: List[Ship]) -> None:
+    def __init__(self, ships: List[Tuple]) -> None:
         # Create a dict `self.field`.
         # Its keys are tuples - the coordinates of the non-empty cells,
         # A value for each cell is a reference to the ship
         # which is located in it
-        self.field = [Ship(ship[0], ship[1]) for ship in ships]
+        self.ships = [Ship(ship[0], ship[1]) for ship in ships]
+
+        self.field = {
+            (deck.row, deck.column): ship
+            for ship in self.ships
+            for deck in ship.decks
+        }
+
         self._validate_field()
 
     def _validate_field(self) -> None:
-        if len(self.field) != 10:
+        if len(self.ships) != 10:
             raise ValueError("There should be 10 ships on the field.")
 
         deck_count = defaultdict(int)
-        for ship in self.field:
+        for ship in self.ships:
             if 1 <= len(ship.decks) <= 4:
                 deck_count[len(ship.decks)] += 1
             else:
@@ -87,14 +94,14 @@ class Battleship:
         # x for decks of the drowned ship
 
         output = [["~" for _ in range(10)] for _ in range(10)]
-        for ship in self.field:
-            for deck in ship.decks:
-                if deck.is_alive:
-                    output[deck.row][deck.column] = "□"
-                else:
-                    output[deck.row][deck.column] = (
-                        "x" if ship.is_drowned else "*"
-                    )
+
+        for (row, column), ship in self.field.items():
+            deck = ship.get_deck(row, column)
+            if deck.is_alive:
+                output[row][column] = "□"
+            else:
+                output[row][column] = "x" if ship.is_drowned else "*"
+
         return "\n".join("  ".join(row) for row in output)
 
     def fire(self, location: tuple) -> str:
@@ -103,9 +110,10 @@ class Battleship:
         if this cell is the last alive in the ship or not."""
 
         row, column = location
-        for ship in self.field:
-            if ship.get_deck(row, column):
-                if ship.fire(row, column):
-                    return "Sunk!"
-                return "Hit!"
+
+        if (row, column) in self.field:
+            ship = self.field[(row, column)]
+            if ship.fire(row, column):
+                return "Sunk!"
+            return "Hit!"
         return "Miss!"
